@@ -1,5 +1,5 @@
 # Byte-compiled / optimized / DLL files
-/mad2-python-venv/
+/mad2-venv/
 
 __pycache__/
 *.py[cod]
