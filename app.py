@@ -3,7 +3,7 @@ from flask import Flask, render_template, request, flash, redirect, url_for, ses
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 from flask_sqlalchemy import SQLAlchemy
-from datetime import date
+from datetime import date, datetime
 from sqlalchemy.exc import IntegrityError
 
 #database initialization
@@ -65,7 +65,7 @@ if not os.path.exists(instance_path):
     os.makedirs(instance_path)
 db_uri = 'sqlite:///' + os.path.join(instance_path, 'db.sqlite3')
 app.config['SQLALCHEMY_DATABASE_URI'] = db_uri 
-app.config['SECRET_KEY'] = '7219357419' 
+app.config['SECRET_KEY'] = os.getenv('APP_SECRET_KEY') 
 
 #database initialization
 db.init_app(app)
@@ -151,13 +151,13 @@ def user_dashboard():
             avg_rating_ = 0
             n = 0
             for rating in avg_rating:
-                if rating.rating != "":
+                if rating.rating:
                     avg_rating_ += int(rating.rating)
                     n += 1
             if n != 0:
                 avg_rating = avg_rating_/n
             else:
-                avg_rating = "Error"
+                avg_rating = "-"
         else:
             avg_rating = "-"
         section = Section.query.get(book.section_id)
@@ -217,9 +217,11 @@ def user_books():
         book = Book.query.get(user_book.book_id)
         days_requested = user_book.days_requested
         date_borrowed = user_book.date_borrowed
-        if date.today().day - date_borrowed.day > days_requested:
+        if (datetime.now() - date_borrowed).days > days_requested:
+            print("Borrow limit exceeded")
+            flash('Borrow limit exceeded for book: ' + book.book_title +"Hence book returned")
             user_book.status = 'completed'
-            user_book.date_returned = date.today()
+            user_book.date_returned = datetime.now()
             db.session.commit()
     user_id = session['user_id']
     user = User.query.filter_by(id=user_id).first()
@@ -249,8 +251,7 @@ def user_books():
                 'section': section_.section_title,
                 'author': book.author,
                 'id': book.id,
-                'days remaining': user_book.days_requested - 
-                (date.today().day - user_book.date_borrowed.day)
+                'days remaining': user_book.days_requested - (datetime.now()-user_book.date_borrowed).days
             }
             current_books.append(book_dict)
     completed_books = []
@@ -298,7 +299,7 @@ def request_book():
         userbooks_entry  = UserBook(user_id=user_id, book_id=book_id, status='requested',
                                      paid = False, days_requested=days_requested) 
         new_request = BookRequests(book_id= book_id, user_id=user_id, 
-                                   date = date.today() ,days_requested=days_requested)
+                                   date = datetime.now() ,days_requested=days_requested)
         db.session.add(new_request)
         db.session.add(userbooks_entry)
         db.session.commit()
@@ -344,7 +345,7 @@ def return_book(book_id, user_id):
     user_book = UserBook.query.filter_by(book_id=book_id, user_id=user_id).first()
     if user_book:
         user_book.status = 'completed'
-        user_book.date_returned = date.today()
+        user_book.date_returned = datetime.now()
         user_book.times_read += 1
         db.session.commit()
     return redirect(url_for('user_books'))
@@ -517,32 +518,32 @@ def librarian_login_post():
     flash('Login successful')
     return redirect(url_for('librarian_dashboard'))
 
-@app.route('/library/register')
-def librarian_register():
-    return render_template('registerlib.html')
+# @app.route('/library/register')
+# def librarian_register():
+#     return render_template('registerlib.html')
 
-@app.route('/library/register', methods=['POST'])
-def librarian_register_post():
-    username = request.form.get('u_name')
-    libraryname = request.form.get('libraryname')
-    password = request.form.get('pwd')
-    confirm_password = request.form.get('c_pwd')
-    if password != confirm_password:
-        flash('Passwords do not match')
-        return redirect(url_for('librarian_register'))
-    library = Librarian.query.filter_by(username=username).first()
-    if library:
-        flash('Username already exists')
-        return redirect(url_for('librarian_register'))
-    password_hash = generate_password_hash(password)
-    new_user = Librarian(username=username, passhashed=password_hash, libraryname=libraryname)
-    try:
-        db.session.add(new_user)
-        db.session.commit()
-    except IntegrityError:
-        flash('You cannot register a library again. Please login using your credentials.')
-        return redirect(url_for('librarian_login'))
-    return redirect(url_for('librarian_login'))
+# @app.route('/library/register', methods=['POST'])
+# def librarian_register_post():
+#     username = request.form.get('u_name')
+#     libraryname = request.form.get('libraryname')
+#     password = request.form.get('pwd')
+#     confirm_password = request.form.get('c_pwd')
+#     if password != confirm_password:
+#         flash('Passwords do not match')
+#         return redirect(url_for('librarian_register'))
+#     library = Librarian.query.filter_by(username=username).first()
+#     if library:
+#         flash('Username already exists')
+#         return redirect(url_for('librarian_register'))
+#     password_hash = generate_password_hash(password)
+#     new_user = Librarian(username=username, passhashed=password_hash, libraryname=libraryname)
+#     try:
+#         db.session.add(new_user)
+#         db.session.commit()
+#     except IntegrityError:
+#         flash('You cannot register a library again. Please login using your credentials.')
+#         return redirect(url_for('librarian_login'))
+#     return redirect(url_for('librarian_login'))
 
 @app.route('/library/home', methods=['GET', 'POST'])
 def librarian_dashboard():
@@ -627,8 +628,7 @@ def current_books():
             section = Section.query.get(book.section_id)
             if search_keyword.lower() in book.book_title.lower():
                 if selected_section in section.section_title:
-                    validity = user_book.days_requested - (
-                        date.today().day - user_book.date_borrowed.day)  
+                    validity = user_book.days_requested - (datetime.now() - user_book.date_borrowed).days  
                     book_dict = {
                         'title': book.book_title,
                         'author': book.author,
@@ -650,9 +650,9 @@ def current_books():
             book = Book.query.get(user_book.book_id)
             days_requested = user_book.days_requested
             date_borrowed = user_book.date_borrowed
-            if date.today().day - date_borrowed.day > days_requested:
+            if (datetime.now() - date_borrowed).days > days_requested:
                 user_book.status = 'completed'
-                user_book.date_returned = date.today()
+                user_book.date_returned = datetime.now()
                 db.session.commit()
         user_books = UserBook.query.filter_by(status='accepted').all()  
         book_list = []
@@ -660,7 +660,7 @@ def current_books():
         for user_book in user_books:
             book = Book.query.get(user_book.book_id)
             section = Section.query.get(book.section_id)
-            validity = user_book.days_requested - (date.today().day - user_book.date_borrowed.day)  
+            validity = user_book.days_requested - (datetime.now().day - user_book.date_borrowed.day)  
 
             book_dict = {
                 'title': book.book_title,
@@ -691,7 +691,7 @@ def add_section():
         section_title = request.form.get('sectionName')
         description = request.form.get('sectionDescription')
         section_image = request.form.get('sectionImage')
-        new_section = Section(section_title=section_title, date_created=date.today(),
+        new_section = Section(section_title=section_title, date_created=datetime.now(),
                                description=description, Image=section_image)
         db.session.add(new_section)
         db.session.commit()
@@ -722,7 +722,7 @@ def add_book():
         book_link = f'/static/books/{book_name}.pdf'
         new_book = Book(section_id=section_id, book_title=book_title,
                         author=author, description=description, 
-                        date_created=date.today(), Image=book_image, link=book_link)
+                        date_created=datetime.now(), Image=book_image, link=book_link)
         db.session.add(new_book)
         db.session.commit()
         return redirect(url_for('librarian_dashboard'))
@@ -785,10 +785,10 @@ def delete_book():
         flash('Please login to continue')
         return redirect(url_for('librarian_login'))
     book_id = request.args.get('book_id')
-    book_name = Book.query.get(book_id).book_title.replace(" ", "")
-    book_file_path = os.path.join(app.root_path, 'static', 'books', f'{book_name}.pdf')
-    if os.path.exists(book_file_path):
-        os.remove(book_file_path)
+    book_path = Book.query.filter_by(id=book_id).first().link
+    cwd = os.getcwd()
+    if os.path.exists(cwd+ book_path):
+        os.remove(os.getcwd() +book_path)
     Book.query.filter_by(id=book_id).delete()
     UserBook.query.filter_by(book_id=book_id).delete()
     BookRequests.query.filter_by(book_id=book_id).delete()
@@ -805,7 +805,7 @@ def grantboooks():
     user_book = UserBook.query.filter_by(user_id=user_id, book_id=book_id, status= 'requested').first()
     if user_book:
         user_book.status = 'accepted'
-        user_book.date_borrowed = date.today()
+        user_book.date_borrowed = datetime.now()
         user_book.days_requested = book_request.days_requested
         db.session.delete(book_request)
         db.session.commit()
@@ -823,6 +823,7 @@ def rejectbooks():
     user_book = UserBook.query.filter_by(user_id=user_id, book_id=book_id, status = 'requested').first()
     if user_book:
         db.session.delete(user_book)
+        print("this book", user_book, "should be delted from userbooks")
         db.session.delete(book_request)
         db.session.commit()
     else:
@@ -837,10 +838,18 @@ def delete_section():
         return redirect(url_for('librarian_login'))
     s_id = request.args.get('section_id')
     section = Section.query.get(s_id)
+    delete_book_ids = []
+    for book in Book.query.filter_by(section_id=s_id).all():
+        delete_book_ids.append(book.id)
     if section:
+        for book_id in delete_book_ids:
+            book_path = Book.query.filter_by(id=book_id).first().link
+            cwd = os.getcwd()
+            if os.path.exists(cwd+ book_path):
+                os.remove(os.getcwd() +book_path)
         Book.query.filter_by(section_id=s_id).delete()
-        BookRequests.query.filter_by(section_id=s_id).delete()
-        UserBook.query.filter_by(section_id=s_id).delete()
+        BookRequests.query.filter(BookRequests.book_id.in_(delete_book_ids)).delete(synchronize_session=False)
+        UserBook.query.filter(UserBook.book_id.in_(delete_book_ids)).delete(synchronize_session=False)
         db.session.delete(section)
         db.session.commit()
     return redirect(url_for('librarian_dashboard'))
@@ -861,7 +870,7 @@ def revoke_access():
     user_book = UserBook.query.filter_by(user_id=user_id, book_id=book_id, status='accepted').first()
     if user_book:
         user_book.status = 'completed'
-        user_book.date_returned = date.today()
+        user_book.date_returned = datetime.now()
         db.session.commit()
     return redirect(url_for('current_books'))
 
