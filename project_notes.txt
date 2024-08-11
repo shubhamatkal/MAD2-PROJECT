@@ -1,0 +1,74 @@
+vuejs for ui
+Redis for caching
+Redis and Celery for batch jobs
+A user can request for maximum of 5 e-books at a time
+A user can update their profile page, rate an e-book.
+A user can request for a maximum of 5 e-books at a time
+
+
+
+
+==backend jobs===
+8. Backend Jobs
+
+ 
+
+Scheduled Job - Daily reminders - The application should send daily reminders to users on g-chat using Google Chat Webhooks or SMS or mail
+ 
+
+Check if a user has not visited/has a return date approaching
+If yes, then send the alert asking them to visit/return the book
+The reminder can be sent in the evening, every day (students can choose the time)
+ 
+
+ 
+
+Scheduled Job - Monthly Activity Report - Device a monthly report for the librarian created using HTML and sent via mail.
+ 
+
+The activity report can consist of sections & e-books issued, return dates ratings received on sections/e-books etc.
+For monthly report to be sent, start a job on first day of every month → create a report using above parameters → send it as email
+ 
+
+User Triggered Async Job - Export as CSV - Devise a CSV format details for the issued/returned/granted e-books done by the librarian.
+ 
+
+This export is meant to download the Name, Content, Author(s), Date issued, Return date etc.
+Have a dashboard from where the librarian can trigger the export
+This should trigger a batch job, send an alert once done
+ 
+
+ 
+
+9. Performance and Caching
+
+ 
+
+Add caching where required to increase the performance
+Add cache expiry
+API Performance
+
+
+==================
+Recommended Functionalities
+ 
+
+Well designed PDF reports for Monthly activity report (Students can choose between HTML and PDF reports)
+Download e-books as PDF for a price
+Once paid and downloaded, the e-book always remains accessible to the user
+External APIs/libraries for creating charts, e.g. ChartJS
+Single Responsive UI for both Mobile and Desktop
+Unified UI that works across devices
+Add to desktop feature
+Implementing frontend validation on all the form fields using HTML5 form validation or JavaScript
+Implementing backend validation within your APIs
+ 
+
+Optional Functionalities
+ 
+
+Provide styling and aesthetics to your application by creating a beautiful and responsive frontend using simple CSS or Bootstrap
+Incorporate a proper login system to prevent unauthorized access to the app using flask extensions like flask_login, flask_security etc.
+Implement a dummy payment portal (just a view taking payment details from user for an e-book)
+Any additional feature you feel is appropriate for the application
+ 

@@ -5,6 +5,7 @@ import os
 from flask_sqlalchemy import SQLAlchemy
 from datetime import date, datetime
 from sqlalchemy.exc import IntegrityError
+from flask import jsonify
 
 #database initialization
 db = SQLAlchemy()
@@ -66,6 +67,10 @@ if not os.path.exists(instance_path):
 db_uri = 'sqlite:///' + os.path.join(instance_path, 'db.sqlite3')
 app.config['SQLALCHEMY_DATABASE_URI'] = db_uri 
 app.config['SECRET_KEY'] = os.getenv('APP_SECRET_KEY') 
+# disable CSRF protection, from WTforms as well as flask security
+app.config["WTF_CSRF_CHECK_DEFAULT"] = False
+app.config['SECURITY_CSRF_PROTECT_MECHANISMS'] = []
+app.config['SECURITY_CSRF_IGNORE_UNAUTH_ENDPOINTS'] = True
 
 #database initialization
 db.init_app(app)
@@ -75,7 +80,7 @@ with app.app_context():
 #Routes
 @app.route('/')
 def home():
-    return render_template('index.html')
+    return render_template('new_index.html')
 
 @app.route('/about')
 def about():
@@ -85,45 +90,73 @@ def about():
 def user_login():
     return render_template('userlogin.html')
 
-@app.route('/user/login', methods=['POST'])
+@app.route('/user_login', methods=['POST'])
 def user_login_post():
-    username = request.form.get('u_name')
-    password = request.form.get('pwd')
+    print("in backend in user login")
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    print(username, password, "from backend")
+
+    # username = request.form.get('u_name')
+    # password = request.form.get('pwd')
     user = User.query.filter_by(username=username).first()
     if not user:
-        flash('Username does not exist')
-        return redirect(url_for('user_login'))
+        print("username is not found")
+        return jsonify({'message' : 'not valid username of user'}), 404
+        # flash('Username does not exist')
+        # return redirect(url_for('user_login'))
     if not check_password_hash(user.passhashed, password):
-        flash('Incorrect password')
-        return redirect(url_for('user_login'))
-    session['user_id'] = user.id
-    flash('Login successful')
-    return redirect(url_for('user_dashboard'))
+        # flash('Incorrect password')
+        # return redirect(url_for('user_login'))
+        print("password is incorrect")
+        return jsonify({'message' : 'not valid password of user'}), 404
+    # session['user_id'] = user.id
+    # flash('Login successful')
+    # return redirect(url_for('user_dashboard'))
+    print("Done from backend of user, if no err msg then all cred are fine")
+    return jsonify({'message' : 'success'}), 200
 
 @app.route('/user/register')
 def user_register():
     return render_template('register.html')
 
-@app.route('/user/register', methods=['POST'])
+@app.route('/user_register', methods=['POST'])
 def user_register_post():
-    username = request.form.get('u_name')
-    firstname = request.form.get('first_name')
-    lastname = request.form.get('last_name')
-    password = request.form.get('password')
-    confirm_password = request.form.get('c_password')
+    print("in backend in user regi")
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    confirm_password = data.get('confirmPassword')
+    firstname = data.get('firstname')
+    lastname = data.get('lastname')
+
+    print(username, password, "from backend")
+    # username = request.form.get('u_name')
+    # firstname = request.form.get('first_name')
+    # lastname = request.form.get('last_name')
+    # password = request.form.get('password')
+    # confirm_password = request.form.get('c_password')
     if password != confirm_password:
-        flash('Passwords do not match')
-        return redirect(url_for('user_register'))
+        print("passwords do not match")
+        return jsonify({'message' : 'passwords do not match'}), 404
+        # flash('Passwords do not match')
+        # return redirect(url_for('user_register'))
     user = User.query.filter_by(username=username).first()
     if user:
-        flash('Username already exists')
-        return redirect(url_for('user_register'))
+        # flash('Username already exists')
+        # return redirect(url_for('user_register'))
+        print("username already exists")
+        return jsonify({'message' : 'username already exists'}), 404
     password_hash = generate_password_hash(password)
     new_user = User(username=username, passhashed=password_hash, 
                     firstname=firstname, lastname=lastname)
     db.session.add(new_user)
     db.session.commit()
-    return redirect(url_for('user_login'))
+    # return redirect(url_for('user_login'))
+    print("Done from backend of user registration, if no err msg then all cred are fine")
+    return jsonify({'message' : 'success'}), 200
+
 
 @app.route('/user/dashboard', methods=['GET', 'POST'])
 def user_dashboard():
@@ -503,20 +536,31 @@ def user_stats():
 def librarian_login():
     return render_template('liblogin.html')
 
-@app.route('/library/login', methods=['POST'])
+@app.route('/lib_login', methods=['POST'])
 def librarian_login_post():
-    username = request.form.get('u_name')
-    password = request.form.get('pwd')
+    print("in backend in lib login")
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    print(username, password, "from backend")
+    # username = request.form.get('u_name')
+    # password = request.form.get('pwd')
     library = Librarian.query.filter_by(username=username).first()
     if not library:
-        flash('Username does not exist')
-        return redirect(url_for('librarian_login'))
+        print("username is not found")
+        return jsonify({'message' : 'not valid email'}), 404
+        # flash('Username does not exist')
+        # return redirect(url_for('librarian_login'))
     if not check_password_hash(library.passhashed, password):
-        flash('Incorrect password')
-        return redirect(url_for('librarian_login'))
-    session['lib_id'] = library.id
-    flash('Login successful')
-    return redirect(url_for('librarian_dashboard'))
+        # flash('Incorrect password')
+        print("password is incorrect")
+        return jsonify({'message' : 'not valid password'}), 404
+        # return redirect(url_for('librarian_login'))
+    # session['lib_id'] = library.id
+    # flash('Login successful')
+    # return redirect(url_for('librarian_dashboard'))
+    print("Done from backend , if no err msg then all cred are fine")
+    return jsonify({'message' : 'success'}), 200
 
 # @app.route('/library/register')
 # def librarian_register():
